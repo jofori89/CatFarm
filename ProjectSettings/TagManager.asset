@@ -7,6 +7,7 @@ TagManager:
   - Cat
   - bowl_full
   - bowl_empty
+  - bowl
   layers:
   - Default
   - TransparentFX

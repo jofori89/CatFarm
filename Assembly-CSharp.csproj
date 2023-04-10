@@ -59,8 +59,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\GameController.cs" />
-    <Compile Include="Assets\Scripts\BowlBehaviour.cs" />
+    <Compile Include="Assets\Scripts\Bowl.cs" />
+    <Compile Include="Assets\Scripts\BowlManager.cs" />
     <Compile Include="Assets\Scripts\CatBehaviour.cs" />
+    <Compile Include="Assets\Scripts\Cat.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
