@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GameController : MonoBehaviour
 {
@@ -6,20 +7,80 @@ public class GameController : MonoBehaviour
 
     public readonly float RoomXLength = 7;
 
-    public static GameController Instance;
+    private static GameController instance = null;
+    private static readonly Object syncRoot = new();
 
-    private void Awake()
+    public static GameController Instance
     {
-        Instance = this;
+        get
+        {
+            if (instance != null)
+            {
+                return instance;
+            }
+
+            lock (syncRoot)
+            {
+                if (instance == null)
+                {
+                    instance = FindObjectOfType(typeof(GameController)) as GameController;
+                    if (instance == null)
+                        instance = new();
+                }
+            }
+            return instance;
+        }
     }
 
-    // Start is called before the first frame update
-    private void Start()
+    [SerializeField]
+    private Text _LblScore;
+
+    [SerializeField]
+    private Text _LblCats;
+
+    [SerializeField]
+    private int _score;
+
+    private void FixedUpdate()
     {
+        if (_LblScore != null)
+        { 
+            _LblScore.text = $"Score: {_score}";
+        }
+
+        if(_LblCats != null)
+        {
+            _LblCats.text = $"{CatBehaviour.Instance.Cats.Count} cats";
+        }
     }
 
-    // Update is called once per frame
-    private void Update()
+    public void ChangeScore(ScoreChangeType type)
     {
+        switch (type)
+        {
+            case ScoreChangeType.FoodRefill:
+                _score++;
+                break;
+
+            case ScoreChangeType.CatIncrease:
+                _score += 2;
+                break;
+
+            case ScoreChangeType.CatDecrease:
+                _score--;
+                break;
+        }
+
+        if(_score < 0)
+        {
+            _score = 0;
+        }
     }
+}
+
+public enum ScoreChangeType
+{
+    FoodRefill,
+    CatIncrease,
+    CatDecrease
 }

@@ -5,46 +5,158 @@ using UnityEngine;
 
 public class Cat : MonoBehaviour
 {
-    private readonly int _maxFullLevel = 30;
+    private readonly uint _maxFullLevel = 30;
 
-    [SerializeField]
-    public int FullLevel { get; private set; } = 10;
+    private readonly uint _maxMature = 3;
 
-    [SerializeField]
-    public bool IsHungry => FullLevel <= 25;
+    public uint FullLevel { get; private set; } = 10;
+
+    public bool IsHungry => FullLevel <= 15;
 
     public bool IsFull => FullLevel == _maxFullLevel;
 
-    public bool IsDoingSomething { get; private set; }
+    public uint MatureLevel { get; set; } = 1;
+
+    public bool CanReproduce => MatureLevel == _maxMature;
+
+    public bool IsDoingSomething => _action != null;
+
+    private CatAction? _action;
 
     private bool _isMoving;
 
-    private Coroutine id;
+    private Coroutine cidHungry;
 
-    private void Move(float roomX, float roomY)
+    private Coroutine cidPlayAround;
+
+    private Rigidbody2D _rb;
+
+    private Vector3? _targetPoint;
+
+    public delegate void OnDieAction();
+    public event OnDieAction OnDie;
+
+    private void Start()
     {
-        if (IsDoingSomething || _isMoving)
+        //_rb = GetComponent<Rigidbody2D>();
+
+        cidHungry = StartCoroutine(DoCountDownHungry());  //fires coroutine
+
+        cidPlayAround = StartCoroutine(RandomMovingAround());
+    }
+
+    private void FixedUpdate()
+    {
+        MoveFunction();
+    }
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        Eat(collision.gameObject);
+
+        Mating(collision.gameObject);
+    }
+
+    private void OnTriggerStay2D(Collider2D collision)
+    {
+        Eat(collision.gameObject);
+    }
+
+    public void StartMating()
+    {
+        _action = CatAction.Mating;
+    }
+
+    public void StopMating()
+    {
+        _action = null;
+    }
+
+    private void Mating(GameObject obj)
+    {
+        if (!obj.CompareTag("cat"))
         {
             return;
         }
 
-        var directionX = RandomDirection();
-        var directionY = RandomDirection();
+        var otherCat = obj.GetComponent<Cat>();
 
-        var stepX = UnityEngine.Random.value * directionX;
-        var stepY = UnityEngine.Random.value * directionY;
-
-        if (Math.Abs(stepX + gameObject.transform.position.x) >= roomX)
+        if(otherCat.IsDoingSomething || !otherCat.CanReproduce)
         {
-            stepX = 0;
+            return;
+        }       
+
+        Reproduce(otherCat);
+    }
+
+    private void Reproduce(Cat otherCat)
+    {
+        Debug.Log("Reproduce");
+
+        StartMating();
+         otherCat.StartMating();
+
+        CatBehaviour.Instance.Spawn(1, transform.position.x, transform.position.y);
+
+        MatureLevel = 1;
+        otherCat.MatureLevel = 1;
+        StopMating();
+        otherCat.StopMating();        
+    }
+
+    private void Eat(GameObject obj)
+    {
+        if (!obj.CompareTag("bowl") || _action != CatAction.Eating)
+        {
+            return;
         }
 
-        if (Math.Abs(stepY + gameObject.transform.position.y) >= roomY)
-        {
-            stepY = 0;
-        }
+        var bowl = obj.GetComponent<Bowl>();
 
-        StartCoroutine(MoveFunction(transform.position += new Vector3(stepX, stepY, 0), 1.0f));
+        // try with other bowl
+        if (bowl.IsEmpty)
+        {         
+            GotoEat();
+        }
+        else
+        {
+            EatAndGrow(bowl);
+        }        
+    }
+
+    /// <summary>
+    /// Wander around the room, change direction each 3 seconds
+    /// </summary>
+    /// <param name="roomX"></param>
+    /// <param name="roomY"></param>
+    /// <returns></returns>
+    private IEnumerator RandomMovingAround()
+    {
+        while (true)
+        {
+            if (_isMoving || IsDoingSomething)
+            {
+                yield return new WaitForSeconds(1.0f);
+                continue;
+            }
+
+            var targetX = (RandomDirection() * UnityEngine.Random.value) + transform.position.x;
+            var targetY = (RandomDirection() * UnityEngine.Random.value) + transform.position.y;
+
+            if (Math.Abs(targetX) >= GameController.Instance.RoomXLength)
+            {
+                targetX = transform.position.x;
+            }
+
+            if (Math.Abs(targetY) >= GameController.Instance.RoomYLength)
+            {
+                targetY = transform.position.y;
+            }
+
+            _targetPoint = new Vector3(targetX, targetY, 0);
+
+            yield return new WaitForSeconds(1.0f);
+        }
     }
 
     private int RandomDirection()
@@ -52,25 +164,59 @@ public class Cat : MonoBehaviour
         return UnityEngine.Random.value < 0.5f ? 1 : -1;
     }
 
-    private void Start()
-    {
-        id = StartCoroutine(DoCountDownHungry());  //fires coroutine
-    }
-
-    private void Update()
-    {
-        Move(GameController.Instance.RoomXLength, GameController.Instance.RoomYLength);
-    }
-
     private void GotoEat()
     {
-        IsDoingSomething = true;
+        _action = CatAction.Eating;
 
-        Debug.Log("GotoEat");
+        var (nearestBowl, magnitude) = FindBowl();
 
+        if (nearestBowl == null)
+        {
+            _action = null;
+            Debug.Log("No bowl.");
+            return;
+        }
+
+        _targetPoint = nearestBowl.transform.position;
+    }
+
+    /// <summary>
+    /// Eat and grow, increase the size, mature level
+    /// </summary>
+    /// <param name="nearestBowl"></param>
+    private void EatAndGrow(Bowl bowl)
+    {
+        new WaitForSeconds(0.5f);
+
+        if (FullLevel < _maxFullLevel)
+        {
+            bowl.DecreaseFood(1);
+            FullLevel =  _maxFullLevel;
+        }
+
+        // grow
+        if (MatureLevel < _maxFullLevel)
+        {
+            MatureLevel++;
+
+            // increase the body size
+            if (gameObject.transform.localScale.x < 1)
+            {
+                gameObject.transform.localScale += new Vector3(0.1f, 0.1f);
+            }
+        }
+
+        _action = null;
+    }
+
+    /// <summary>
+    /// Find the nearest bowl which not empty
+    /// </summary>
+    /// <returns></returns>
+    private (Bowl bowl, float magnitude) FindBowl()
+    {
         Bowl nearestBowl = null;
         float magnitude = 0;
-
         foreach (var bowl in BowlManager.Instance.Bowls.Where(o => !o.IsEmpty))
         {
             var offset = transform.position - bowl.transform.position;
@@ -82,49 +228,18 @@ public class Cat : MonoBehaviour
             }
         }
 
-        IsDoingSomething = false;
-        if (nearestBowl == null)
+        return (nearestBowl, magnitude);
+    }
+
+    private void MoveFunction()
+    {
+        if (_targetPoint == null || _isMoving || transform.position == _targetPoint.GetValueOrDefault())
         {
-            Debug.Log("No bowl.");
             return;
         }
 
-        Debug.Log("Bowl " + nearestBowl.transform.position);
-
-        StartCoroutine(MoveFunction(nearestBowl.transform.position, magnitude));
-
-        new WaitForSeconds(0.5f);
-        FullLevel = nearestBowl.DecreaseFood(3) * 10;
-
-        IsDoingSomething = false;
-    }
-
-    private IEnumerator MoveFunction(Vector3 newPosition, float duration)
-    {
-        if (_isMoving)
-        {
-            yield break; ///exit if this is still running
-        }
-
         _isMoving = true;
-
-        float counter = 0f;
-        while (counter < duration)
-        {
-            counter += Time.deltaTime;
-            transform.position = Vector3.Lerp(transform.position, newPosition, counter / duration);
-
-            // If the object has arrived, stop the coroutine
-            if (transform.position == newPosition)
-            {
-                _isMoving = false;
-                yield break;
-            }
-
-            // Otherwise, continue next frame
-            yield return null;
-        }
-
+        transform.Translate((_targetPoint.GetValueOrDefault() - transform.position) * Time.deltaTime, Space.Self);
         _isMoving = false;
     }
 
@@ -135,7 +250,7 @@ public class Cat : MonoBehaviour
             yield return new WaitForSeconds(1);
             FullLevel--;
 
-            if (FullLevel > 0 && IsHungry)
+            if (IsHungry && FullLevel > 0 && _action != CatAction.Eating)
             {
                 GotoEat();
             }
@@ -143,10 +258,23 @@ public class Cat : MonoBehaviour
             // timer is finished...
             if (FullLevel == 0)
             {
+                OnDie?.Invoke();
                 Destroy(gameObject, 1);
+                StopCoroutine(cidHungry);
+
+                if (cidPlayAround != null)
+                {
+                    StopCoroutine(cidPlayAround);
+                }
             }
         }
-
-        StopCoroutine(id);
     }
+}
+
+internal enum CatAction
+{
+    Eating,
+    Playing,
+    TakeShit,
+    Mating
 }

@@ -5,9 +5,8 @@ public class BowlManager : MonoBehaviour
 {
     public static BowlManager Instance;
 
-    private readonly int _maxBowl = 5;
+    private int _maxBowl;
 
-    [SerializeField]
     public List<Bowl> Bowls { private set; get; } = new();
 
     [SerializeField]
@@ -15,29 +14,31 @@ public class BowlManager : MonoBehaviour
 
     private void Awake()
     {
+        _maxBowl = 5;
         Instance = this;
     }
 
     private void Start()
     {
-        SpawnBowls();
-    }
 
-    // Update is called once per frame
-    private void Update()
-    {
-       
+        SpawnBowls();
     }
 
     private void SpawnBowls()
     {
         for (int i = _maxBowl; i > 0; i--)
         {
-            var bowl = Instantiate(_bowlPrefab, new Vector3(Random.Range(-7f, 7f), Random.Range(-1f, -4f), 0), Quaternion.identity);
 
-            bowl.Init(this);
+            var bowl = Instantiate(_bowlPrefab, new Vector3(Random.Range(-7f, 7f), Random.Range(-1f, -4f), 0), Quaternion.identity);
+            bowl.OnRefilled += IncreaseScore;
+            bowl.Init();
+
             Bowls.Add(bowl);
         }
     }
 
+    private void IncreaseScore()
+    {
+        GameController.Instance.ChangeScore(ScoreChangeType.FoodRefill);
+    }
 }

@@ -2,23 +2,23 @@ using UnityEngine;
 
 public class Bowl : MonoBehaviour
 {
-    private readonly int _capacity = 10;
+    private readonly uint _capacity = 10;
 
     public float LevelPercentage => Level / _capacity * 100;
 
     [SerializeField]
-    public int Level { get; private set; }
+    public uint Level { get; private set; }
 
     public bool IsEmpty => Level == 0;
 
     public bool IsFull => Level == _capacity;
 
-    private BowlManager _manager;
+    public delegate void OnRefilledAction();
+    public event OnRefilledAction OnRefilled;
 
-    public void Init(BowlManager manager)
+    public void Init()
     {
-        _manager = manager;
-        Level = _capacity;
+        Level = 0;
 
         var path = $"Sprites/bowls/cat_bowl_{(IsEmpty ? "empty" : "full")}";
         var avatar = Resources.Load<Sprite>(path);
@@ -44,23 +44,21 @@ public class Bowl : MonoBehaviour
             return;
         }
 
-        Level = _capacity;
+        Level = _capacity;        
+        gameObject.GetComponent<SpriteRenderer>().sprite = Resources.Load<Sprite>($"Sprites/bowls/cat_bowl_full");
 
-        if (IsFull)
-        {
-            gameObject.GetComponent<SpriteRenderer>().sprite = Resources.Load<Sprite>($"Sprites/bowls/cat_bowl_full");
-        }
+        OnRefilled?.Invoke();
     }
 
     // Eat in
-    public int DecreaseFood(int eatAmount)
+    public uint DecreaseFood(uint eatAmount)
     {
         if (IsEmpty)
         {
             return 0;
         }
 
-        var availableAmount = Level > eatAmount ? eatAmount : Level;
+        uint availableAmount = Level > eatAmount ? eatAmount : Level;
 
         Level -= availableAmount;
 
