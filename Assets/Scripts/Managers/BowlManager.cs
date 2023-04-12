@@ -1,10 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class BowlManager : MonoBehaviour
+public class BowlManager : MonoBehaviourSingleton<BowlManager>
 {
-    public static BowlManager Instance;
-
     private int _maxBowl;
 
     public List<Bowl> Bowls { private set; get; } = new();
@@ -15,12 +13,10 @@ public class BowlManager : MonoBehaviour
     private void Awake()
     {
         _maxBowl = 5;
-        Instance = this;
     }
 
     private void Start()
     {
-
         SpawnBowls();
     }
 
@@ -28,7 +24,6 @@ public class BowlManager : MonoBehaviour
     {
         for (int i = _maxBowl; i > 0; i--)
         {
-
             var bowl = Instantiate(_bowlPrefab, new Vector3(Random.Range(-7f, 7f), Random.Range(-1f, -4f), 0), Quaternion.identity);
             bowl.OnRefilled += IncreaseScore;
             bowl.Init();

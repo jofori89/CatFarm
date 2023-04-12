@@ -1,12 +1,14 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
-public class CatBehaviour : MonoBehaviour
+public class CatManager : MonoBehaviourSingleton<CatManager>
 {
-    public static CatBehaviour Instance;
-
     private int _initCat;
 
+    public int TotalCat { get; private set; }
+
+    [field: SerializeField]
     public List<Cat> Cats { get; } = new List<Cat>();
 
     [SerializeField]
@@ -15,15 +17,16 @@ public class CatBehaviour : MonoBehaviour
     private void Awake()
     {
         _initCat = 2;
-        Instance = this;
     }
 
-    private void Start()
+    public void StartNew()
     {
-        Spawn(_initCat);
+        Cats.Clear();
+        TotalCat = 0;
+        SpawnAsync(_initCat).Wait();
     }
 
-    public void Spawn(int number = 1, float? x = null, float? y = null)
+    public Task<bool> SpawnAsync(int? number = 1, float? x = null, float? y = null)
     {
         var rx = GameController.Instance.RoomXLength;
         var ry = GameController.Instance.RoomYLength;
@@ -39,10 +42,10 @@ public class CatBehaviour : MonoBehaviour
             if (!avatar)
             {
                 Debug.Log("Cat avatar not found: " + path);
-                return;
+                return Task.FromResult(false);
             }
 
-            var cat = Instantiate(_catPrefab, new Vector3(x.GetValueOrDefault(), y.GetValueOrDefault(), 0), Quaternion.identity);
+            var cat = Instantiate(_catPrefab, new Vector2(x.GetValueOrDefault(), y.GetValueOrDefault()), Quaternion.identity);
 
             var renderer = cat.GetComponent<SpriteRenderer>();
             renderer.sprite = avatar;
@@ -50,6 +53,7 @@ public class CatBehaviour : MonoBehaviour
             cat.transform.localScale = new Vector3(0.5f, 0.5f);
             cat.OnDie += () =>
             {
+                TotalCat--;
                 GameController.Instance.ChangeScore(ScoreChangeType.CatDecrease);
             };
 
@@ -59,5 +63,9 @@ public class CatBehaviour : MonoBehaviour
 
             GameController.Instance.ChangeScore(ScoreChangeType.CatIncrease);
         }
+
+        TotalCat += number.GetValueOrDefault(0);
+
+        return Task.FromResult(true);
     }
 }

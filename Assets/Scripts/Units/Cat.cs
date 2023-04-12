@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class Cat : MonoBehaviour
@@ -25,24 +26,20 @@ public class Cat : MonoBehaviour
 
     private bool _isMoving;
 
-    private Coroutine cidHungry;
-
-    private Coroutine cidPlayAround;
-
     private Rigidbody2D _rb;
 
     private Vector3? _targetPoint;
 
     public delegate void OnDieAction();
+
     public event OnDieAction OnDie;
 
     private void Start()
     {
         //_rb = GetComponent<Rigidbody2D>();
 
-        cidHungry = StartCoroutine(DoCountDownHungry());  //fires coroutine
-
-        cidPlayAround = StartCoroutine(RandomMovingAround());
+        DoCountDownHungryAsync();
+        RandomMovingAroundAsync();        
     }
 
     private void FixedUpdate()
@@ -60,6 +57,24 @@ public class Cat : MonoBehaviour
     private void OnTriggerStay2D(Collider2D collision)
     {
         Eat(collision.gameObject);
+    }
+
+    private void OnMouseDown()
+    {
+        TryRunAwayAsync(Input.mousePosition);
+    }
+
+    private Task<bool> TryRunAwayAsync(Vector3 position)
+    {
+        _action = null;
+        _targetPoint += VectorFromAngle(Vector2.Angle(position, transform.position)) * 2;
+
+        return Task.FromResult(true);
+    }
+
+    private Vector2 VectorFromAngle(float theta)
+    {
+        return new Vector2(Mathf.Cos(theta), Mathf.Sin(theta)); // Trig is fun
     }
 
     public void StartMating()
@@ -81,10 +96,10 @@ public class Cat : MonoBehaviour
 
         var otherCat = obj.GetComponent<Cat>();
 
-        if(otherCat.IsDoingSomething || !otherCat.CanReproduce)
+        if (otherCat.IsDoingSomething || !otherCat.CanReproduce)
         {
             return;
-        }       
+        }
 
         Reproduce(otherCat);
     }
@@ -94,14 +109,14 @@ public class Cat : MonoBehaviour
         Debug.Log("Reproduce");
 
         StartMating();
-         otherCat.StartMating();
+        otherCat.StartMating();
 
-        CatBehaviour.Instance.Spawn(1, transform.position.x, transform.position.y);
+        CatManager.Instance.SpawnAsync(1, transform.position.x, transform.position.y);
 
         MatureLevel = 1;
         otherCat.MatureLevel = 1;
         StopMating();
-        otherCat.StopMating();        
+        otherCat.StopMating();
     }
 
     private void Eat(GameObject obj)
@@ -115,13 +130,13 @@ public class Cat : MonoBehaviour
 
         // try with other bowl
         if (bowl.IsEmpty)
-        {         
+        {
             GotoEat();
         }
         else
         {
             EatAndGrow(bowl);
-        }        
+        }
     }
 
     /// <summary>
@@ -130,13 +145,15 @@ public class Cat : MonoBehaviour
     /// <param name="roomX"></param>
     /// <param name="roomY"></param>
     /// <returns></returns>
-    private IEnumerator RandomMovingAround()
+    private async Task RandomMovingAroundAsync()
     {
-        while (true)
+        while (FullLevel > 0)
         {
+            await Task.Delay(1000);
+            await Task.Yield();
+
             if (_isMoving || IsDoingSomething)
-            {
-                yield return new WaitForSeconds(1.0f);
+            {                
                 continue;
             }
 
@@ -154,8 +171,6 @@ public class Cat : MonoBehaviour
             }
 
             _targetPoint = new Vector3(targetX, targetY, 0);
-
-            yield return new WaitForSeconds(1.0f);
         }
     }
 
@@ -191,7 +206,7 @@ public class Cat : MonoBehaviour
         if (FullLevel < _maxFullLevel)
         {
             bowl.DecreaseFood(1);
-            FullLevel =  _maxFullLevel;
+            FullLevel = _maxFullLevel;
         }
 
         // grow
@@ -243,30 +258,26 @@ public class Cat : MonoBehaviour
         _isMoving = false;
     }
 
-    private IEnumerator DoCountDownHungry()
+    private async Task DoCountDownHungryAsync()
     {
-        while (FullLevel >= 0)
+        while (FullLevel > 0)
         {
-            yield return new WaitForSeconds(1);
+            await Task.Delay(1000);
+            await Task.Yield();
+
             FullLevel--;
 
             if (IsHungry && FullLevel > 0 && _action != CatAction.Eating)
             {
                 GotoEat();
             }
+        }
 
-            // timer is finished...
-            if (FullLevel == 0)
-            {
-                OnDie?.Invoke();
-                Destroy(gameObject, 1);
-                StopCoroutine(cidHungry);
-
-                if (cidPlayAround != null)
-                {
-                    StopCoroutine(cidPlayAround);
-                }
-            }
+        // timer is finished...
+        if (FullLevel == 0)
+        {
+            OnDie?.Invoke();
+            Destroy(gameObject);
         }
     }
 }
