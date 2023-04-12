@@ -18,7 +18,7 @@ public class Bowl : MonoBehaviour
 
     public void Init()
     {
-        Level = 0;
+        Level = _capacity;
 
         var path = $"Sprites/bowls/cat_bowl_{(IsEmpty ? "empty" : "full")}";
         var avatar = Resources.Load<Sprite>(path);

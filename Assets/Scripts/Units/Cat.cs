@@ -18,11 +18,11 @@ public class Cat : MonoBehaviour
 
     public uint MatureLevel { get; set; } = 1;
 
-    public bool CanReproduce => MatureLevel == _maxMature;
+    public bool CanReproduce => MatureLevel >= _maxMature;
 
     public bool IsDoingSomething => _action != null;
 
-    private CatAction? _action;
+    private CatAction? _action = null;
 
     private bool _isMoving;
 
@@ -61,15 +61,18 @@ public class Cat : MonoBehaviour
 
     private void OnMouseDown()
     {
-        TryRunAwayAsync(Input.mousePosition);
+        if (!gameObject.CompareTag("cat"))
+        {
+            return;
+        }
+
+        TryRunAway(Input.mousePosition);
     }
 
-    private Task<bool> TryRunAwayAsync(Vector3 position)
+    private void TryRunAway(Vector3 position)
     {
         _action = null;
-        _targetPoint += VectorFromAngle(Vector2.Angle(position, transform.position)) * 2;
-
-        return Task.FromResult(true);
+        _targetPoint += VectorFromAngle(Vector2.Angle(position, transform.position)) * 3;
     }
 
     private Vector2 VectorFromAngle(float theta)
@@ -94,10 +97,17 @@ public class Cat : MonoBehaviour
             return;
         }
 
+        if (IsDoingSomething || !CanReproduce)
+        {
+            Debug.Log("Busy: " + _action + " - MatureLevel: " +  MatureLevel);
+            return;
+        }
+
         var otherCat = obj.GetComponent<Cat>();
 
         if (otherCat.IsDoingSomething || !otherCat.CanReproduce)
         {
+            Debug.Log("Target Busy: " + _action + " - MatureLevel: " +  MatureLevel);
             return;
         }
 
@@ -210,7 +220,7 @@ public class Cat : MonoBehaviour
         }
 
         // grow
-        if (MatureLevel < _maxFullLevel)
+        if (MatureLevel < _maxMature)
         {
             MatureLevel++;
 
@@ -254,7 +264,7 @@ public class Cat : MonoBehaviour
         }
 
         _isMoving = true;
-        transform.Translate((_targetPoint.GetValueOrDefault() - transform.position) * Time.deltaTime, Space.Self);
+        transform.Translate((_targetPoint.GetValueOrDefault() - transform.position) * Time.deltaTime);
         _isMoving = false;
     }
 

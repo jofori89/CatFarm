@@ -34,7 +34,7 @@ public class CatManager : MonoBehaviourSingleton<CatManager>
         for (int i = 0; i < number; i++)
         {
             x ??= UnityEngine.Random.Range(-rx, rx);
-            y ??= UnityEngine.Random.Range(-ry, 0);
+            y ??= UnityEngine.Random.Range(-ry, i);
 
             var path = $"Sprites/cats/cat_{UnityEngine.Random.Range(1, 10).ToString().PadLeft(2, '0')}";
             var avatar = Resources.Load<Sprite>(path);
@@ -45,7 +45,7 @@ public class CatManager : MonoBehaviourSingleton<CatManager>
                 return Task.FromResult(false);
             }
 
-            var cat = Instantiate(_catPrefab, new Vector2(x.GetValueOrDefault(), y.GetValueOrDefault()), Quaternion.identity);
+            var cat = Instantiate(_catPrefab, new Vector3(x.Value, y.Value, 0), Quaternion.identity);
 
             var renderer = cat.GetComponent<SpriteRenderer>();
             renderer.sprite = avatar;
@@ -65,6 +65,13 @@ public class CatManager : MonoBehaviourSingleton<CatManager>
         }
 
         TotalCat += number.GetValueOrDefault(0);
+
+        // Increase bowl
+
+        if (TotalCat % 5 == 0 && BowlManager.Instance.Bowls.Count * 5 <= TotalCat)
+        {
+            BowlManager.Instance.AddMoreBowl();
+        }
 
         return Task.FromResult(true);
     }
